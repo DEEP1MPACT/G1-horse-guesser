@@ -1,74 +1,3 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><script type="text/javascript">
-    var gk_isXlsx = false;
-    var gk_xlsxFileLookup = {};
-    var gk_fileData = {};
-    function filledCell(cell) {
-      return cell !== '' && cell != null;
-    }
-    function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex));
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-    }
-</script>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -89,7 +18,7 @@
 </head>
 <body class="bg-gray-100 flex flex-col items-center min-h-screen p-4">
   <h1 class="text-3xl font-bold mb-4">赛马猜猜呗</h1>
-  
+
   <!-- 设置区域 -->
   <div id="setup" class="mb-4 w-full max-w-md">
     <div class="mb-2">
@@ -176,7 +105,7 @@
       aliases: []
     };
 
-    // 读取赛驹数据 .xlsx 文件
+    // 读取赛驹数据
     document.getElementById("fileInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -196,7 +125,7 @@
       reader.readAsArrayBuffer(file);
     });
 
-    // 读取别名数据 .xlsx 文件
+    // 读取别名
     document.getElementById("aliasInput").addEventListener("change", async (e) => {
       const file = e.target.files[0];
       if (!file) return;
@@ -207,23 +136,23 @@
           const workbook = XLSX.read(data, { type: "array" });
           const sheet = workbook.Sheets[workbook.SheetNames[0]];
           const json = XLSX.utils.sheet_to_json(sheet, { header: ["馬名", "别名"] });
-          
+
           const horseNames = new Set(gameState.horses.map(h => h.name));
           let invalidRows = 0;
           gameState.aliasMap = {};
           gameState.aliases = [];
-          
+
           json.forEach(row => {
             const horseName = row["馬名"];
             const aliases = row["别名"] ? row["别名"].split(",").map(a => a.trim()).filter(a => a) : [];
             if (!horseName || !horseNames.has(horseName)) {
-              console.warn(`无效行：馬名 "${horseName}" 不存在于赛驹数据中`);
+              console.warn(`无效行：馬名 "${horseName}" 不存在`);
               invalidRows++;
               return;
             }
             aliases.forEach(alias => {
               if (gameState.aliasMap[alias]) {
-                console.warn(`重复别名：${alias} 已映射到 ${gameState.aliasMap[alias]}，新映射到 ${horseName}`);
+                console.warn(`重复别名：${alias}`);
               }
               gameState.aliasMap[alias] = horseName;
               gameState.aliases.push(alias);
@@ -231,8 +160,7 @@
           });
 
           console.log("别名映射：", gameState.aliasMap);
-          console.log(`加载别名数：${gameState.aliases.length}，无效行：${invalidRows}`);
-          alert(`别名数据加载成功！共 ${gameState.aliases.length} 个别名，${invalidRows} 行无效数据。`);
+          alert(`别名数据加载成功！别名：${gameState.aliases.length}，无效行：${invalidRows}`);
         } catch (error) {
           alert("读取别名数据失败：" + error.message);
         }
@@ -248,11 +176,10 @@
       const raceNames = new Set();
       json.forEach(row => {
         if (!row["馬名"] || !row["レース日付"]) {
-          console.warn("跳过无效行：缺少馬名或レース日付", row);
+          console.warn("跳过无效行", row);
           invalidRows++;
           return;
         }
-
         const horseName = row["馬名"];
         let year;
         try {
@@ -263,12 +190,8 @@
           invalidRows++;
           return;
         }
-
         if (!horseMap[horseName]) {
           const gender = validGenders.includes(row["性別"]) ? row["性別"] : "未知";
-          if (row["性別"] && !validGenders.includes(row["性別"])) {
-            console.warn(`无效性別值：${row["性別"]}，马名：${horseName}，使用默认值“未知”`);
-          }
           horseMap[horseName] = {
             name: horseName,
             gender: gender,
@@ -280,15 +203,19 @@
             owners: new Set(),
             winRaces: [],
             winTracks: new Set(),
-            sharedRaces: []
+            sharedRaces: [],
+            colors: new Set()
           };
         }
-
         const horse = horseMap[horseName];
         horse.years.add(year);
         if (row["騎手"]) horse.jockeys.add(row["騎手"]);
         if (row["調教師"]) horse.trainers.add(row["調教師"]);
         if (row["馬主"]) horse.owners.add(row["馬主"]);
+        if (row["胜负服颜色"]) {
+          const colors = row["胜负服颜色"].split("，").map(c => c.trim()).filter(c => c);
+          colors.forEach(color => horse.colors.add(color));
+        }
         const finishPosition = parseInt(row["着順"], 10);
         const raceName = row["レース名"] || "";
         if (raceName) raceNames.add(raceName);
@@ -309,15 +236,6 @@
         }
       });
 
-      console.log("处理后的赛驹数据（minG1Wins=" + gameState.minG1Wins + "）：");
-      Object.values(horseMap).forEach(horse => {
-        console.log(`马名: ${horse.name}, G1胜利: ${horse.g1Wins}, 年份: ${Array.from(horse.years).join(", ")}, 获胜比赛: ${horse.winRaces.map(r => `${r.name} (${r.year})`).join(", ")}`);
-      });
-      console.log("所有比赛名称：", Array.from(raceNames));
-      if (invalidRows > 0) {
-        console.warn(`总共跳过 ${invalidRows} 行无效数据`);
-      }
-
       return Object.values(horseMap)
         .filter(horse => horse.g1Wins >= gameState.minG1Wins)
         .map(horse => ({
@@ -331,7 +249,8 @@
           owners: Array.from(horse.owners) || [],
           winRaces: horse.winRaces || [],
           winTracks: Array.from(horse.winTracks) || [],
-          sharedRaces: horse.sharedRaces || []
+          sharedRaces: horse.sharedRaces || [],
+          colors: Array.from(horse.colors) || []
         }));
     }
 
@@ -345,7 +264,7 @@
       gameState.endYear = parseInt(document.getElementById("endYear").value);
       gameState.maxGuesses = parseInt(document.getElementById("maxGuesses").value);
       gameState.minG1Wins = parseInt(document.getElementById("minG1Wins").value);
-      
+
       if (isNaN(gameState.startYear) || isNaN(gameState.endYear) || gameState.startYear > gameState.endYear) {
         alert("请输入有效的年份范围！");
         return;
@@ -371,47 +290,38 @@
         return;
       }
       gameState.answerHorse = gameState.filteredHorses[Math.floor(Math.random() * gameState.filteredHorses.length)];
-      
-      console.log("过滤后的备选赛驹（minG1Wins=" + gameState.minG1Wins + "）：", 
-        gameState.filteredHorses.map(h => `${h.name} (G1胜利: ${h.g1Wins})`));
 
       document.getElementById("setup").classList.add("hidden");
       document.getElementById("game").classList.remove("hidden");
       document.getElementById("guessTable").classList.remove("hidden");
       document.getElementById("guessesLeft").textContent = `剩余猜测次数：${gameState.guessesLeft}`;
-      
+
       updateHorseList(gameState.filteredHorses);
     });
 
-    // 更新 datalist 选项（整合本名和别名）
+    // 更新 datalist
     function updateHorseList(horses) {
       const dataList = document.getElementById("horseList");
       dataList.innerHTML = "";
       horses.forEach(horse => {
-        // 收集该赛驹的所有别名
         const aliases = Object.keys(gameState.aliasMap).filter(
           alias => gameState.aliasMap[alias] === horse.name
         );
-        // 创建单一选项，显示 本名 (别名1, 别名2, ...)
         const option = document.createElement("option");
-        option.value = horse.name; // value 为本名
+        option.value = horse.name;
         option.setAttribute("data-horse", horse.name);
-        // 如果有别名，显示 本名 (别名1, 别名2, ...)，否则只显示本名
-        option.textContent = aliases.length > 0 
+        option.textContent = aliases.length > 0
           ? `${horse.name} (${aliases.join(", ")})`
           : horse.name;
         dataList.appendChild(option);
       });
-      console.log("更新备选列表：", horses.map(h => `${h.name} (G1胜利: ${h.g1Wins})`));
     }
 
-    // 输入过滤（支持本名和别名）
+    // 输入过滤
     document.getElementById("horseInput").addEventListener("input", (e) => {
       const input = e.target.value.toLowerCase().trim();
       const filtered = gameState.filteredHorses.filter(horse => {
-        // 检查本名是否匹配
         if (horse.name.toLowerCase().includes(input)) return true;
-        // 检查别名是否匹配
         return gameState.aliases.some(
           alias => alias.toLowerCase().includes(input) && gameState.aliasMap[alias] === horse.name
         );
@@ -419,7 +329,7 @@
       updateHorseList(filtered);
     });
 
-    // 提交猜测（支持别名）
+    // 提交猜测
     document.getElementById("submitGuess").addEventListener("click", () => {
       let guess = document.getElementById("horseInput").value;
       if (!guess) {
@@ -428,7 +338,6 @@
       }
       if (gameState.aliasMap[guess]) {
         guess = gameState.aliasMap[guess];
-        console.log(`别名 ${guess} 映射到赛驹：${guess}`);
       }
       const horse = gameState.filteredHorses.find(h => h.name === guess);
       if (!horse) {
@@ -441,7 +350,7 @@
       document.getElementById("guessesLeft").textContent = `剩余猜测次数：${gameState.guessesLeft}`;
       document.getElementById("horseInput").value = "";
       updateHorseList(gameState.filteredHorses);
-      
+
       if (guess === gameState.answerHorse.name || gameState.guessesLeft === 0) {
         gameState.state = "ended";
         document.getElementById("game").classList.add("hidden");
@@ -455,24 +364,27 @@
       }
     });
 
-    // 重新开始
+    // 重新开始（修复：保留用户设置）
     document.getElementById("restartGame").addEventListener("click", () => {
       gameState.state = "setup";
       gameState.guesses = [];
       gameState.guessesLeft = 0;
       gameState.answerHorse = null;
-      document.getElementById("setup").classList.add("hidden");
+      document.getElementById("setup").classList.remove("hidden");
       document.getElementById("game").classList.add("hidden");
       document.getElementById("ended").classList.add("hidden");
       document.getElementById("guessTable").classList.add("hidden");
       document.getElementById("tableBody").innerHTML = "";
+      document.getElementById("horseInput").value = "";
+      document.getElementById("guessesLeft").textContent = "";
+      // 移除重置输入框的代码，保留用户设置
     });
 
-    // 显示猜测结果
+    // 显示猜测
     function displayGuess(horse) {
       const tableBody = document.getElementById("tableBody");
       const row = document.createElement("tr");
-      
+
       row.innerHTML += `<td class="p-2 border">${horse.name}</td>`;
       const genderDiff = compareGender(horse.gender, gameState.answerHorse.gender);
       row.innerHTML += `<td class="p-2 border ${genderDiff.class}">${horse.gender}</td>`;
@@ -486,7 +398,7 @@
       row.innerHTML += `<td class="p-2 border">${features}</td>`;
       const sharedRaces = getSharedRaces(horse, gameState.answerHorse).join(", ") || "无";
       row.innerHTML += `<td class="p-2 border">${sharedRaces}</td>`;
-      
+
       tableBody.prepend(row);
     }
 
@@ -534,7 +446,8 @@
         ...(horse.trainers || []).map(t => ({ type: "练马师", value: t })),
         ...(horse.owners || []).map(o => ({ type: "马主", value: o })),
         ...[...new Set((horse.winRaces || []).map(r => r.name))].map(name => ({ type: "获胜比赛", value: name })),
-        ...(horse.winTracks || []).map(t => ({ type: "胜出赛场", value: t }))
+        ...(horse.winTracks || []).map(t => ({ type: "胜出赛场", value: t })),
+        ...(horse.colors || []).map(c => ({ type: "胜负服颜色", value: c }))
       ];
       return features.map(f => {
         const isMatch = checkFeatureMatch(f.type, f.value);
@@ -549,6 +462,7 @@
       if (type === "马主" && (gameState.answerHorse.owners || []).includes(value)) return true;
       if (type === "获胜比赛" && (gameState.answerHorse.winRaces || []).some(r => r.name === value)) return true;
       if (type === "胜出赛场" && (gameState.answerHorse.winTracks || []).includes(value)) return true;
+      if (type === "胜负服颜色" && (gameState.answerHorse.colors || []).includes(value)) return true;
       return false;
     }
 
